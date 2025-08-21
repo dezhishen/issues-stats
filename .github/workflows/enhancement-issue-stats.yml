@@ -27,10 +27,10 @@ jobs:
           TARGET_REPO: ${{ vars.TARGET_REPO }}
         run: node .github/scripts/enhancement-issue-stats.js
 
-      - name: Commit stats file
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add stats/enhancements-stats.md
-          git commit -m "chore: update enhancements stats [auto]" || echo "No changes"
-          git push
+      - name: Deploy enhancement stats to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./enhancement
+          publish_branch: gh-pages
+          force_orphan: true
