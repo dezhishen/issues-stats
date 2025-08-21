@@ -22,6 +22,7 @@ jobs:
 
       - name: Run stats script
         env:
+          ENHANCEMENT_LABEL: ${{ vars.ENHANCEMENT_LABEL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TARGET_REPO: ${{ vars.TARGET_REPO }}
         run: node .github/scripts/enhancement-issue-stats.js
