@@ -6,7 +6,6 @@ if (!process.env.TARGET_REPO) {
 }
 const [owner, repo] = process.env.TARGET_REPO.split('/');
 
-// label变量名更正为ENHANCEMENT_LABEL，未设置时默认为'enhancement'
 const label = process.env.ENHANCEMENT_LABEL || 'enhancement';
 
 const headers = {
@@ -24,7 +23,8 @@ const reactionEmoji = {
 };
 
 async function fetchAllLabelIssues(page = 1, per_page = 100, acc = []) {
-  const url = `https://api.github.com/repos/${owner}/${repo}/issues?labels=${encodeURIComponent(label)}&state=all&per_page=${per_page}&page=${page}`;
+  // 只统计 open 状态
+  const url = `https://api.github.com/repos/${owner}/${repo}/issues?labels=${encodeURIComponent(label)}&state=open&per_page=${per_page}&page=${page}`;
   const res = await fetch(url, { headers });
   const issues = await res.json();
   if (!Array.isArray(issues)) throw new Error('Failed to fetch issues');
@@ -55,27 +55,55 @@ async function fetchReactions(issue_number) {
       number: issue.number,
       title: issue.title,
       comments: issue.comments,
-      reactions: reactionCount
+      reactions: reactionCount,
+      url: issue.html_url
     });
   }
 
-  let md = `# "${label}" Issues Stats for ${owner}/${repo}\n\n`;
-  md += `统计时间：${new Date().toISOString()}\n\n`;
-  md += `| Issue | Title | Comments |`;
-  for (const type of reactionTypes) {
-    md += ` ${reactionEmoji[type]} |`;
-  }
-  md += '\n|-------|-------|----------|';
-  for (const _ of reactionTypes) md += '---|';
-  md += '\n';
+  let html = `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>${label} Issues Stats for ${owner}/${repo}</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+    th { background: #f6f8fa; }
+    caption { text-align: left; font-size: 1.2em; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>“${label}” Issues Stats for ${owner}/${repo}</h1>
+  <p>统计时间：${new Date().toLocaleString()}</p>
+  <table>
+    <caption>只统计 open 状态的 issues</caption>
+    <thead>
+      <tr>
+        <th>Issue</th>
+        <th>Title</th>
+        <th>Comments</th>
+        ${reactionTypes.map(type => `<th>${reactionEmoji[type]}</th>`).join('')}
+      </tr>
+    </thead>
+    <tbody>
+`;
+
   for (const s of stats) {
-    md += `| [#${s.number}](https://github.com/${owner}/${repo}/issues/${s.number}) | ${s.title.replace(/\|/g, '\\|')} | ${s.comments} |`;
-    for (const type of reactionTypes) {
-      md += ` ${s.reactions[type]} |`;
-    }
-    md += '\n';
+    html += `<tr>
+      <td><a href="${s.url}" target="_blank">#${s.number}</a></td>
+      <td>${s.title.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+      <td>${s.comments}</td>
+      ${reactionTypes.map(type => `<td>${s.reactions[type]}</td>`).join('')}
+    </tr>\n`;
   }
 
+  html += `</tbody></table>
+  <p>数据来源：<a href="https://github.com/${owner}/${repo}">${owner}/${repo}</a></p>
+</body>
+</html>
+`;
+
   fs.mkdirSync('enhancement', { recursive: true });
-  fs.writeFileSync('enhancement/enhancements-stats.md', md);
+  fs.writeFileSync('enhancement/enhancements-stats.html', html);
 })();
